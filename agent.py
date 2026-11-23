@@ -55,6 +55,7 @@ def ping() -> dict:
 
 
 @app.post("/invocations")
+@app.post("/internal/resources/{resource_id}/invocations", include_in_schema=False)
 def run(body: Invocation) -> dict:
     prompt = body.prompt.strip()
     if not prompt:
@@ -64,6 +65,10 @@ def run(body: Invocation) -> dict:
         return invoke(prompt)
     except Exception as exc:
         provider_response = getattr(exc, "response", {})
-        error_code = provider_response.get("Error", {}).get("Code", type(exc).__name__)
+        provider_error = provider_response.get("Error", {})
+        error_code = provider_error.get("Code", type(exc).__name__)
+        detail = {"code": error_code}
+        if error_code == "AccessDeniedException" and provider_error.get("Message"):
+            detail["message"] = provider_error["Message"][:700]
         logger.error("Sonnet 5 invocation failed (%s)", error_code)
-        raise HTTPException(status_code=502, detail={"code": error_code}) from exc
+        raise HTTPException(status_code=502, detail=detail) from exc
