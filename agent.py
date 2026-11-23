@@ -12,9 +12,10 @@ app = FastAPI(title="Strands Sonnet 5 smoke test")
 
 class Invocation(BaseModel):
     prompt: str = Field(min_length=1, max_length=500)
+    streaming: bool = True
 
 
-def invoke(prompt: str) -> dict:
+def invoke(prompt: str, *, streaming: bool = True) -> dict:
     from strands import Agent, tool
     from strands.models import BedrockModel
 
@@ -36,6 +37,7 @@ def invoke(prompt: str) -> dict:
         model_id=MODEL_ID,
         region_name=os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1",
         max_tokens=256,
+        streaming=streaming,
     )
     agent = Agent(
         model=model,
@@ -62,7 +64,7 @@ def run(body: Invocation) -> dict:
         raise HTTPException(status_code=422, detail="Prompt must not be blank")
 
     try:
-        return invoke(prompt)
+        return invoke(prompt, streaming=body.streaming)
     except Exception as exc:
         provider_response = getattr(exc, "response", {})
         provider_error = provider_response.get("Error", {})
